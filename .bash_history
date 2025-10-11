@@ -23,3 +23,6 @@ git pull
 git push
 git push --set-upstream origin main
 . "\home\msfadmin\.cursor-server\bin\a9c77ceae65b77ff772d6adfe05f24d8ebcb2790/out/vs/workbench/contrib/terminal/common/scripts/shellIntegration-bash.sh"
+cd /home/msfadmin
+. "\home\msfadmin\.cursor-server\bin\a9c77ceae65b77ff772d6adfe05f24d8ebcb2790/out/vs/workbench/contrib/terminal/common/scripts/shellIntegration-bash.sh"
+. "\home\msfadmin\.cursor-server\bin\a9c77ceae65b77ff772d6adfe05f24d8ebcb2790/out/vs/workbench/contrib/terminal/common/scripts/shellIntegration-bash.sh"
