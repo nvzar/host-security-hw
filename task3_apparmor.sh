@@ -32,3 +32,4 @@ echo "   sudo apt remove apparmor apparmor-utils"
 echo ""
 echo "4. Проверьте статус:"
 echo "   sudo systemctl status apparmor"
+

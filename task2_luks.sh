@@ -32,3 +32,4 @@ echo "   sudo mount /dev/mapper/encrypted_partition /mnt/encrypted"
 echo ""
 echo "6. Проверьте монтирование:"
 echo "   df -h | grep encrypted"
+
