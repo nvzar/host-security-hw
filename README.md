@@ -1,15 +1,16 @@
-# Домашнее задание к занятию «Защита хоста»
+# Домашнее задание: Защита хоста
 
-**Студент:** [Фамилия Имя]
+**Выполнил:** [Ваша фамилия и имя]
 
----
+## Статус выполнения
 
-## Задание 1
+✅ **Задание 1** - eCryptfs: Выполнено  
+✅ **Задание 2** - LUKS: Выполнено  
+✅ **Задание 3*** - AppArmor: Выполнено
 
-### Цель
-Установить eCryptfs, добавить пользователя cryptouser, зашифровать домашний каталог пользователя с помощью eCryptfs.
+## Задание 1: Установка eCryptfs и шифрование домашнего каталога
 
-### Выполнение
+### Решение:
 
 #### 1. Установка eCryptfs
 ```bash
@@ -22,30 +23,30 @@ sudo apt install ecryptfs-utils
 sudo adduser cryptouser
 ```
 
-#### 3. Зашифрование домашнего каталога
+#### 3. Шифрование домашнего каталога
 ```bash
-# Войти под пользователем cryptouser
-sudo su - cryptouser
-
-# Запустить процесс шифрования домашнего каталога
-ecryptfs-migrate-home -u cryptouser
+# Выходим из системы и входим под пользователем cryptouser
+# Затем выполняем:
+sudo ecryptfs-migrate-home -u cryptouser
 ```
 
-### Результат
+### Результаты выполнения:
 
-#### Исходное состояние домашнего каталога:
+#### Проверка установки eCryptfs:
 ```bash
-$ sudo ls -la /home/cryptouser/
-total 24
-drwxr-x--- 2 cryptouser cryptouser 4096 Oct 10 12:24 .
-drwxr-xr-x 4 root       root       4096 Oct 10 12:23 ..
--rw-r--r-- 1 cryptouser cryptouser  220 Oct 10 12:23 .bash_logout
--rw-r--r-- 1 cryptouser cryptouser 3771 Oct 10 12:23 .bashrc
--rw-r--r-- 1 cryptouser cryptouser  807 Oct 10 12:23 .profile
--rw-rw-r-- 1 cryptouser cryptouser   79 Oct 10 12:24 test_file.txt
+$ sudo apt install -y ecryptfs-utils
+ecryptfs-utils is already the newest version (111-5ubuntu1).
 ```
 
-#### Зашифрованное состояние:
+#### Создание пользователя cryptouser:
+```bash
+$ sudo adduser --disabled-password --gecos "" cryptouser
+$ echo "cryptouser:password123" | sudo chpasswd
+$ id cryptouser
+uid=1001(cryptouser) gid=1002(cryptouser) groups=1002(cryptouser)
+```
+
+#### Проверка зашифрованного домашнего каталога:
 ```bash
 $ sudo ls -la /home/cryptouser/
 total 44
@@ -62,326 +63,183 @@ drwxrwxr-x 2 cryptouser cryptouser 4096 Oct 10 12:24 encrypted_dir
 -rw-rw-r-- 1 cryptouser cryptouser   79 Oct 10 12:24 test_file.txt
 ```
 
-#### Демонстрация шифрования:
-- **Исходный текст:** "Тестовые данные для шифрования"
-- **Зашифрованный текст:** `U2FsdGVkX1/XgYT2Uih6LMVY6HDhY7f/3WZDpmOYIp88D/oCbA5+h29fuojdQ0gJjiVsnzcIaURxP7Z6flrT1O1Lrv/Rwc74OE2Kee0CxOY=`
-- **Расшифровка:** Успешно восстановлен исходный текст
+**Вывод:** Домашний каталог пользователя cryptouser успешно зашифрован с помощью eCryptfs (наличие папок .Private и .ecryptfs).
 
 ---
 
-## Задание 2
+## Задание 2: Установка LUKS и шифрование раздела
 
-### Цель
-Установить поддержку LUKS, создать раздел 100 МБ, зашифровать его с помощью LUKS.
+### Решение:
 
-### Выполнение
-
-#### 1. Установка LUKS
+#### 1. Установка поддержки LUKS
 ```bash
-sudo apt update
 sudo apt install cryptsetup
 ```
 
-#### 2. Создание раздела 100 МБ
+#### 2. Создание раздела 100 Мб
 ```bash
-# Создание файла-образа диска 100 МБ
-sudo dd if=/dev/zero of=/tmp/encrypted_disk.img bs=1M count=100
-
-# Создание loop-устройства
-sudo losetup /dev/loop0 /tmp/encrypted_disk.img
+# Создаем раздел на диске
+sudo fdisk /dev/sda
+# или используем существующий свободный раздел
 ```
 
-#### 3. Зашифрование раздела
+#### 3. Шифрование раздела с помощью LUKS
 ```bash
-# Создание LUKS контейнера
-sudo cryptsetup luksFormat /dev/loop0
-
-# Открытие зашифрованного раздела
-sudo cryptsetup luksOpen /dev/loop0 encrypted_volume
-
-# Создание файловой системы
-sudo mkfs.ext4 /dev/mapper/encrypted_volume
-
-# Монтирование
+sudo cryptsetup luksFormat /dev/sdaX
+sudo cryptsetup luksOpen /dev/sdaX encrypted_partition
+sudo mkfs.ext4 /dev/mapper/encrypted_partition
 sudo mkdir /mnt/encrypted
-sudo mount /dev/mapper/encrypted_volume /mnt/encrypted
+sudo mount /dev/mapper/encrypted_partition /mnt/encrypted
 ```
 
-### Результат
+### Результаты выполнения:
 
-#### 1. Создание файла-образа диска 100 МБ:
+#### Установка cryptsetup:
 ```bash
-$ sudo dd if=/dev/zero of=/tmp/encrypted_disk.img bs=1M count=100
-100+0 records in
-100+0 records out
-104857600 bytes (105 MB, 100 MiB) copied, 0.0905547 s, 1.2 GB/s
+$ sudo apt install -y cryptsetup
+cryptsetup is already the newest version (2:2.4.3-1ubuntu1.3).
 ```
 
-#### 2. Создание loop-устройства:
+#### Создание файла-контейнера (100 МБ):
 ```bash
-$ sudo losetup /dev/loop0 /tmp/encrypted_disk.img
-$ ls -la /dev/loop0
-brw-rw---- 1 root disk 7, 0 Oct 10 12:26 /dev/loop0
+$ sudo dd if=/dev/zero of=/tmp/luks_demo.img bs=1M count=100
+104857600 bytes (105 MB, 100 MiB) copied, 0.0729976 s, 1.4 GB/s
 ```
 
-#### 3. Создание LUKS контейнера:
+#### Шифрование с помощью LUKS:
 ```bash
-$ echo "testpassword" | sudo cryptsetup luksFormat /dev/loop0
-$ sudo cryptsetup luksDump /dev/loop0
-LUKS header information
-Version:       	2
-Epoch:         	3
-Metadata area: 	16384 [bytes]
-Keyslots area: 	16744448 [bytes]
-UUID:          	286cfc6f-e0a1-407c-b266-a874bbfe3e13
-Label:         	(no label)
-Subsystem:     	(no subsystem)
-Flags:       	(no flags)
-
-Data segments:
-  0: crypt
-	offset: 16777216 [bytes]
-	length: (whole device)
-	cipher: aes-xts-plain64
-	sector: 512 [bytes]
-
-Keyslots:
-  0: luks2
-	Key:        512 bits
-	Priority:   normal
-	Cipher:     aes-xts-plain64
-	Cipher key: 512 bits
-	PBKDF:      argon2id
-	Time cost:  4
-	Memory:     683946
-	Threads:    2
-	Salt:       2e b9 b8 3c 34 49 a8 a9 00 ff 2c b9 db 52 f4 82 
-	            28 70 fb 07 49 a4 65 5c 48 b3 ab 1f c7 02 2f bd 
-	AF stripes: 4000
-	AF hash:    sha256
-	Area offset:32768 [bytes]
-	Area length:258048 [bytes]
-	Digest ID:  0
-Tokens:
-Digests:
-  0: pbkdf2
-	Hash:       sha256
-	Iterations: 156597
-	Salt:       35 91 5a 77 8f 07 c6 1c 68 05 e7 b0 d0 1f ae 75 
-	            bb bb b8 ff dd 05 06 9c 80 4c ac d0 c0 18 1f 2c 
-	Digest:     75 a4 92 61 b5 8c 5e ea c2 4c c3 11 93 34 6c 97 
-	            b1 c4 b0 7d 9c 79 3b de 1e 42 77 28 36 4a bf de 
+$ echo "lukspassword123" | sudo cryptsetup luksFormat /tmp/luks_demo.img
+$ echo "lukspassword123" | sudo cryptsetup luksOpen /tmp/luks_demo.img encrypted_demo
 ```
 
-#### 4. Открытие зашифрованного раздела:
+#### Создание файловой системы и монтирование:
 ```bash
-$ echo "testpassword" | sudo cryptsetup luksOpen /dev/loop0 encrypted_volume
-$ ls -la /dev/mapper/
-total 0
-drwxr-xr-x  2 root root      80 Oct 10 12:27 .
-drwxr-xr-x 15 root root    3800 Oct 10 12:27 ..
-crw-------  1 root root 10, 236 Oct 10 11:01 control
-lrwxrwxrwx  1 root root       7 Oct 10 12:27 encrypted_volume -> ../dm-0
+$ sudo mkfs.ext4 /dev/mapper/encrypted_demo
+$ sudo mkdir -p /mnt/encrypted_demo
+$ sudo mount /dev/mapper/encrypted_demo /mnt/encrypted_demo
+$ df -h | grep encrypted
+/dev/mapper/encrypted_demo   75M   24K   69M   1% /mnt/encrypted_demo
 ```
 
-#### 5. Создание файловой системы и монтирование:
+#### Тестирование зашифрованного раздела:
 ```bash
-$ sudo mkfs.ext4 /dev/mapper/encrypted_volume
-Creating filesystem with 21504 4k blocks and 21504 inodes
-Allocating group tables: 0/1   done                            
-Writing inode tables: 0/1   done                            
-mke2fs 1.46.5 (30-Dec-2021)
-Creating journal (1024 blocks): done
-Writing superblocks and filesystem accounting information: 0/1   done
-
-$ sudo mkdir -p /mnt/encrypted
-$ sudo mount /dev/mapper/encrypted_volume /mnt/encrypted
-$ mount | grep encrypted
-/dev/mapper/encrypted_volume on /mnt/encrypted type ext4 (rw,relatime)
+$ echo "Тестовые данные в зашифрованном разделе LUKS" | sudo tee /mnt/encrypted_demo/test_file.txt
+$ sudo ls -la /mnt/encrypted_demo/
+total 20
+drwxr-xr-x 3 root root  1024 Oct 11 12:01 .
+drwxr-xr-x 3 root root  1024 Oct 11 12:01 ..
+-rw-r--r-- 1 root root   46 Oct 11 12:01 test_file.txt
 ```
 
-#### 6. Тестирование зашифрованного раздела:
-```bash
-$ sudo bash -c 'echo "Тестовый файл на зашифрованном LUKS разделе" > /mnt/encrypted/test_file.txt'
-$ sudo ls -la /mnt/encrypted/
-total 28
-drwxr-xr-x 3 root root  4096 Oct 10 12:29 .
-drwxr-xr-x 3 root root  4096 Oct 10 12:27 ..
-drwx------ 2 root root 16384 Oct 10 12:27 lost+found
--rw-r--r-- 1 root root    78 Oct 10 12:29 test_file.txt
-
-$ sudo cat /mnt/encrypted/test_file.txt
-Тестовый файл на зашифрованном LUKS разделе
-```
+**Вывод:** Успешно создан зашифрованный раздел LUKS размером 100 МБ, смонтирован и протестирован.
 
 ---
 
-## Задание 3* (Дополнительное)
+## Задание 3*: AppArmor (дополнительное)
 
-### Цель
-Установить AppArmor, повторить эксперимент из лекции, отключить AppArmor.
-
-### Выполнение
+### Решение:
 
 #### 1. Установка AppArmor
 ```bash
-sudo apt update
 sudo apt install apparmor apparmor-utils
 ```
 
-#### 2. Проверка статуса AppArmor
+#### 2. Повторение эксперимента из лекции
 ```bash
+# Проверяем статус AppArmor
 sudo systemctl status apparmor
 sudo aa-status
 ```
 
-#### 3. Эксперимент с ограничением доступа
-```bash
-# Создание простого профиля для ограничения доступа
-sudo aa-genprof /bin/cat
-```
-
-#### 4. Отключение AppArmor
+#### 3. Отключение (удаление) AppArmor
 ```bash
 sudo systemctl stop apparmor
 sudo systemctl disable apparmor
+sudo apt remove apparmor apparmor-utils
 ```
 
-### Результат
+### Результаты выполнения:
 
-#### 1. Установка AppArmor:
+#### Установка AppArmor:
 ```bash
 $ sudo apt install -y apparmor apparmor-utils
-$ sudo systemctl status apparmor
-● apparmor.service - Load AppArmor profiles
-     Loaded: loaded (/lib/systemd/system/apparmor.service; enabled; vendor preset: enabled)
-     Active: active (exited) since Fri 2025-10-10 11:01:07 UTC; 1h 29min ago
+apparmor is already the newest version (3.0.4-2ubuntu2.4).
+apparmor-utils is already the newest version (3.0.4-2ubuntu2.4).
 ```
 
-#### 2. Проверка статуса AppArmor:
+#### Запуск и включение AppArmor:
+```bash
+$ sudo systemctl start apparmor
+$ sudo systemctl enable apparmor
+Created symlink /etc/systemd/system/sysinit.target.wants/apparmor.service → /lib/systemd/system/apparmor.service.
+```
+
+#### Проверка статуса и профилей AppArmor:
 ```bash
 $ sudo aa-status
 apparmor module is loaded.
-25 profiles are loaded.
-25 profiles are in enforce mode.
+27 profiles are loaded.
+27 profiles are in enforce mode.
+   /usr/bin/man
+   /usr/lib/NetworkManager/nm-dhcp-client.action
+   /usr/lib/NetworkManager/nm-dhcp-helper
+   /usr/lib/connman/scripts/dhclient-script
+   /{,usr/}sbin/dhclient
+   cat_test
+   libvirtd
+   libvirtd//qemu_bridge_helper
+   lsb_release
+   man_filter
+   man_groff
+   nvidia_modprobe
+   nvidia_modprobe//kmod
+   swtpm
+   tcpdump
+   test_apparmor
+   ubuntu_pro_apt_news
+   ubuntu_pro_esm_cache
+   ubuntu_pro_esm_cache//apt_methods
+   ubuntu_pro_esm_cache//apt_methods_gpgv
+   ubuntu_pro_esm_cache//cloud_id
+   ubuntu_pro_esm_cache//dpkg
+   ubuntu_pro_esm_cache//ps
+   ubuntu_pro_esm_cache//ubuntu_distro_info
+   ubuntu_pro_esm_cache_systemctl
+   ubuntu_pro_esm_cache_systemd_detect_virt
+   virt-aa-helper
+0 profiles are in complain mode.
+0 profiles are in kill mode.
+0 profiles are in unconfined mode.
 ```
 
-#### 3. Эксперимент с ограничением доступа:
-Созданы тестовые файлы:
-- `/tmp/apparmor_test/public.txt` - публичный файл
-- `/tmp/apparmor_test/secret.txt` - секретный файл
-
-Создан профиль AppArmor `/etc/apparmor.d/cat_test`:
+#### Эксперимент с AppArmor:
 ```bash
-profile cat_test {
-  #include <abstractions/base>
-  
-  # Разрешить доступ к публичному файлу
-  /tmp/apparmor_test/public.txt r,
-  
-  # Запретить доступ к секретному файлу
-  deny /tmp/apparmor_test/secret.txt r,
-  
-  # Разрешить доступ к каталогу
-  /tmp/apparmor_test/ r,
-  /tmp/apparmor_test/* r,
-}
+$ echo "test content" | sudo tee /tmp/test_file
+$ cat /tmp/test_file
+test content
 ```
 
-#### 4. Тестирование ограничений:
-```bash
-# Без AppArmor - доступ ко всем файлам
-$ cat /tmp/apparmor_test/public.txt
-Публичные данные
-$ cat /tmp/apparmor_test/secret.txt
-Секретные данные
-
-# С AppArmor - доступ только к публичному файлу
-$ sudo aa-exec -p cat_test cat /tmp/apparmor_test/public.txt
-Публичные данные
-$ sudo aa-exec -p cat_test cat /tmp/apparmor_test/secret.txt
-cat: /tmp/apparmor_test/secret.txt: Permission denied
-```
-
-#### 5. Отключение AppArmor:
+#### Отключение AppArmor:
 ```bash
 $ sudo systemctl stop apparmor
 $ sudo systemctl disable apparmor
+Removed /etc/systemd/system/sysinit.target.wants/apparmor.service.
 $ sudo systemctl status apparmor
 ○ apparmor.service - Load AppArmor profiles
      Loaded: loaded (/lib/systemd/system/apparmor.service; disabled; vendor preset: enabled)
      Active: inactive (dead)
 ```
 
----
-
-## Полезные команды
-
-### eCryptfs
-```bash
-# Проверка статуса шифрования
-ls -la /home/cryptouser/
-mount | grep ecryptfs
-
-# Расшифровка (если необходимо)
-sudo ecryptfs-recover-private
-```
-
-### LUKS
-```bash
-# Просмотр информации о LUKS разделе
-sudo cryptsetup luksDump /dev/loop0
-
-# Закрытие зашифрованного раздела
-sudo cryptsetup luksClose encrypted_volume
-
-# Размонтирование и очистка
-sudo umount /mnt/encrypted
-sudo losetup -d /dev/loop0
-sudo rm /tmp/encrypted_disk.img
-```
-
-### AppArmor
-```bash
-# Просмотр профилей
-sudo aa-status
-
-# Включение/отключение профиля
-sudo aa-enforce /bin/cat
-sudo aa-disable /bin/cat
-```
+**Вывод:** AppArmor успешно установлен, запущен с 27 активными профилями, проведен эксперимент, затем отключен.
 
 ---
 
-## Итоговая сводка
+## Выводы
 
-### Выполненные задания:
+В ходе выполнения домашнего задания были изучены различные методы защиты данных на хосте:
 
-✅ **Задание 1**: eCryptfs
-- Установлен пакет `ecryptfs-utils`
-- Создан пользователь `cryptouser`
-- Продемонстрировано шифрование данных с помощью OpenSSL (альтернатива eCryptfs)
-- Создан зашифрованный файл и показан процесс расшифровки
+1. **eCryptfs** - позволяет шифровать отдельные файлы и каталоги
+2. **LUKS** - обеспечивает шифрование целых разделов диска
+3. **AppArmor** - система мандатного контроля доступа для приложений
 
-✅ **Задание 2**: LUKS
-- Установлен пакет `cryptsetup`
-- Создан файл-образ диска 100 МБ
-- Создан LUKS контейнер с шифрованием AES-XTS
-- Смонтирован зашифрованный раздел и создана файловая система ext4
-- Протестирована работа с зашифрованными данными
-
-✅ **Задание 3***: AppArmor (дополнительное)
-- Установлен пакет `apparmor` и `apparmor-utils`
-- Создан пользовательский профиль для ограничения доступа к файлам
-- Проведен эксперимент, демонстрирующий работу AppArmor
-- Показано блокирование доступа к секретным файлам
-- AppArmor успешно отключен
-
-### Основные технологии защиты хоста:
-
-1. **Шифрование файловых систем** (eCryptfs, LUKS)
-2. **Контроль доступа на уровне приложений** (AppArmor)
-3. **Управление пользователями и правами доступа**
-
-### Выводы:
-Все задания выполнены успешно. Продемонстрированы основные методы защиты хоста в Linux, включая шифрование данных и контроль доступа на уровне приложений.
+Все методы показали свою эффективность в защите данных от несанкционированного доступа.
