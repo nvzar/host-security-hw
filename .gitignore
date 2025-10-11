@@ -32,3 +32,7 @@ VirtualBox\ VMs/
 # AppArmor профили (уже в системе)
 /etc/apparmor.d/test_apparmor
 /etc/apparmor.d/cat_test
+*.zip
+*.vmdk
+security_lab/metasploitable.zip
+security_lab/Metasploitable2-Linux/Metasploitable.vmdk
