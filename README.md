@@ -1,245 +1,172 @@
-# Домашнее задание: Защита хоста
+# Лабораторная работа по сетевой безопасности
 
-**Выполнил:** Зарубов Николай
+## Описание
+Данная лабораторная работа демонстрирует настройку и тестирование систем обнаружения вторжений (IDS) и предотвращения атак на примере Suricata и Fail2Ban.
 
-## Статус выполнения
+## Подготовка системы
 
-✅ **Задание 1** - eCryptfs: Выполнено  
-✅ **Задание 2** - LUKS: Выполнено  
-✅ **Задание 3*** - AppArmor: Выполнено
+### Защищаемая система
+- **ОС**: Ubuntu 22.04.5 LTS
+- **IP-адрес**: 10.128.0.8
+- **Установленные компоненты**:
+  - Suricata 6.0.4 (IDS/IPS)
+  - Fail2Ban 0.11.2 (защита от брутфорс атак)
+  - SSH сервер (OpenSSH 8.9p1)
 
-## Задание 1: Установка eCryptfs и шифрование домашнего каталога
+### Система злоумышленника
+- **IP-адрес**: 10.128.0.8 (та же система для демонстрации)
+- **Установленные инструменты**:
+  - nmap 7.80 (сетевой сканер)
+  - hydra 9.2 (инструмент для брутфорс атак)
 
-### Решение:
+## Задание 1: Разведка системы
 
-#### 1. Установка eCryptfs
+### Выполненные команды nmap:
+
+#### 1. TCP ACK scan (-sA)
 ```bash
-sudo apt update
-sudo apt install ecryptfs-utils
+sudo nmap -sA 10.128.0.8
+```
+**Результат**: Все 1000 портов показаны как unfiltered (не фильтруются)
+
+#### 2. TCP connect scan (-sT)
+```bash
+sudo nmap -sT 10.128.0.8
+```
+**Результат**: Обнаружен открытый порт 22/tcp (SSH)
+
+#### 3. TCP SYN scan (-sS)
+```bash
+sudo nmap -sS 10.128.0.8
+```
+**Результат**: Обнаружен открытый порт 22/tcp (SSH)
+
+#### 4. Version detection scan (-sV)
+```bash
+sudo nmap -sV 10.128.0.8
+```
+**Результат**: 
+- Порт 22/tcp: SSH (OpenSSH 8.9p1 Ubuntu 3ubuntu0.13)
+- Операционная система: Linux
+
+### Анализ логов после разведки:
+
+**Suricata**: Логи пусты - сканирование nmap не было обнаружено как атака
+**Fail2Ban**: Обнаружены предыдущие попытки подключения к SSH от внешних IP-адресов:
+- 209.14.2.218
+- 2.57.121.112  
+- 77.91.82.170
+- 103.93.201.42
+
+## Задание 2: Атака на подбор пароля SSH
+
+### Подготовка файлов для атаки:
+
+**users.txt**:
+```
+msfadmin
+root
+admin
+user
+test
+administrator
+guest
+ubuntu
 ```
 
-#### 2. Создание пользователя cryptouser
-```bash
-sudo adduser cryptouser
+**pass.txt**:
+```
+password
+123456
+admin
+root
+msfadmin
+test
+password123
+letmein
+qwerty
+12345
 ```
 
-#### 3. Шифрование домашнего каталога
+### Попытка атаки с помощью hydra:
 ```bash
-# Выходим из системы и входим под пользователем cryptouser
-# Затем выполняем:
-sudo ecryptfs-migrate-home -u cryptouser
+hydra -L users.txt -P pass.txt 10.128.0.8 ssh
 ```
 
-### Результаты выполнения:
+**Результат**: Атака не удалась из-за настроек SSH (только ключевая аутентификация)
 
-#### Проверка установки eCryptfs:
+### Симуляция атаки:
+Создан скрипт для симуляции множественных попыток подключения с неверными учетными данными:
+
 ```bash
-$ sudo apt install -y ecryptfs-utils
-ecryptfs-utils is already the newest version (111-5ubuntu1).
+#!/bin/bash
+for i in {1..15}; do
+    timeout 3 ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null -o PasswordAuthentication=yes \
+        -l attacker 10.128.0.8 "exit" 2>/dev/null || true
+    sleep 1
+done
 ```
 
-#### Создание пользователя cryptouser:
-```bash
-$ sudo adduser --disabled-password --gecos "" cryptouser
-$ echo "cryptouser:password123" | sudo chpasswd
-$ id cryptouser
-uid=1001(cryptouser) gid=1002(cryptouser) groups=1002(cryptouser)
+## Анализ результатов
+
+### Логи Fail2Ban:
+```
+2025-10-12 07:36:23,922 fail2ban.filter [4535]: INFO [sshd] Found 10.128.0.8 - 2025-10-12 07:36:23
+2025-10-12 07:36:25,009 fail2ban.filter [4535]: INFO [sshd] Found 10.128.0.8 - 2025-10-12 07:36:25
+2025-10-12 07:36:26,096 fail2ban.filter [4535]: INFO [sshd] Found 10.128.0.8 - 2025-10-12 07:36:26
+2025-10-12 07:36:27,189 fail2ban.filter [4535]: INFO [sshd] Found 10.128.0.8 - 2025-10-12 07:36:27
+2025-10-12 07:36:28,321 fail2ban.filter [4535]: INFO [sshd] Found 10.128.0.8 - 2025-10-12 07:36:28
+2025-10-12 07:36:28,701 fail2ban.actions [4535]: NOTICE [sshd] Ban 10.128.0.8
 ```
 
-#### Проверка зашифрованного домашнего каталога:
-```bash
-$ sudo ls -la /home/cryptouser/
-total 44
-drwxr-x--- 5 cryptouser cryptouser 4096 Oct 10 12:25 .
-drwxr-xr-x 4 root       root       4096 Oct 10 12:23 ..
-drwxr-xr-x 2 cryptouser cryptouser 4096 Oct 10 12:25 .Private
--rw-r--r-- 1 cryptouser cryptouser  220 Oct 10 12:23 .bash_logout
--rw-r--r-- 1 cryptouser cryptouser 3771 Oct 10 12:23 .bashrc
-drwx------ 2 cryptouser cryptouser 4096 Oct 10 12:25 .ecryptfs
--rw-r--r-- 1 cryptouser cryptouser  807 Oct 10 12:23 .profile
--rw-r--r-- 1 root       root        110 Oct 10 12:25 encrypted_data.txt
-drwxrwxr-x 2 cryptouser cryptouser 4096 Oct 10 12:24 encrypted_dir
--rw-r--r-- 1 root       root         58 Oct 10 12:25 test_data.txt
--rw-rw-r-- 1 cryptouser cryptouser   79 Oct 10 12:24 test_file.txt
+### Логи SSH:
+```
+Oct 12 07:36:25 test sshd[5828]: Invalid user attacker from 10.128.0.8 port 54382
+Oct 12 07:36:25 test sshd[5828]: Connection closed by invalid user attacker 10.128.0.8 port 54382 [preauth]
+Oct 12 07:36:26 test sshd[5839]: Invalid user attacker from 10.128.0.8 port 48570
+Oct 12 07:36:26 test sshd[5839]: Connection closed by invalid user attacker 10.128.0.8 port 48570 [preauth]
+Oct 12 07:36:27 test sshd[5846]: Invalid user attacker from 10.128.0.8 port 48576
+Oct 12 07:36:27 test sshd[5846]: Connection closed by invalid user attacker 10.128.0.8 port 48576 [preauth]
+Oct 12 07:36:28 test sshd[5858]: Invalid user attacker from 10.128.0.8 port 48588
+Oct 12 07:36:28 test sshd[5858]: Connection closed by invalid user attacker 10.128.0.8 port 48588 [preauth]
 ```
 
-**Вывод:** Домашний каталог пользователя cryptouser успешно зашифрован с помощью eCryptfs (наличие папок .Private и .ecryptfs).
-
----
-
-## Задание 2: Установка LUKS и шифрование раздела
-
-### Решение:
-
-#### 1. Установка поддержки LUKS
-```bash
-sudo apt install cryptsetup
+### Статус Fail2Ban после атаки:
 ```
-
-#### 2. Создание раздела 100 Мб
-```bash
-# Создаем раздел на диске
-sudo fdisk /dev/sda
-# или используем существующий свободный раздел
+Status for the jail: sshd
+|- Filter
+|  |- Currently failed: 4
+|  |- Total failed: 9
+|  `- File list: /var/log/auth.log
+`- Actions
+   |- Currently banned: 1
+   |- Total banned: 1
+   `- Banned IP list: 10.128.0.8
 ```
-
-#### 3. Шифрование раздела с помощью LUKS
-```bash
-sudo cryptsetup luksFormat /dev/sdaX
-sudo cryptsetup luksOpen /dev/sdaX encrypted_partition
-sudo mkfs.ext4 /dev/mapper/encrypted_partition
-sudo mkdir /mnt/encrypted
-sudo mount /dev/mapper/encrypted_partition /mnt/encrypted
-```
-
-### Результаты выполнения:
-
-#### Установка cryptsetup:
-```bash
-$ sudo apt install -y cryptsetup
-cryptsetup is already the newest version (2:2.4.3-1ubuntu1.3).
-```
-
-#### Создание файла-контейнера (100 МБ):
-```bash
-$ sudo dd if=/dev/zero of=/tmp/luks_demo.img bs=1M count=100
-104857600 bytes (105 MB, 100 MiB) copied, 0.0729976 s, 1.4 GB/s
-```
-
-#### Шифрование с помощью LUKS:
-```bash
-$ echo "lukspassword123" | sudo cryptsetup luksFormat /tmp/luks_demo.img
-$ echo "lukspassword123" | sudo cryptsetup luksOpen /tmp/luks_demo.img encrypted_demo
-```
-
-#### Создание файловой системы и монтирование:
-```bash
-$ sudo mkfs.ext4 /dev/mapper/encrypted_demo
-$ sudo mkdir -p /mnt/encrypted_demo
-$ sudo mount /dev/mapper/encrypted_demo /mnt/encrypted_demo
-$ df -h | grep encrypted
-/dev/mapper/encrypted_demo   75M   24K   69M   1% /mnt/encrypted_demo
-```
-
-#### Тестирование зашифрованного раздела:
-```bash
-$ echo "Тестовые данные в зашифрованном разделе LUKS" | sudo tee /mnt/encrypted_demo/test_file.txt
-$ sudo ls -la /mnt/encrypted_demo/
-total 20
-drwxr-xr-x 3 root root  1024 Oct 11 12:01 .
-drwxr-xr-x 3 root root  1024 Oct 11 12:01 ..
--rw-r--r-- 1 root root   46 Oct 11 12:01 test_file.txt
-```
-
-**Вывод:** Успешно создан зашифрованный раздел LUKS размером 100 МБ, смонтирован и протестирован.
-
----
-
-## Задание 3*: AppArmor (дополнительное)
-
-### Решение:
-
-#### 1. Установка AppArmor
-```bash
-sudo apt install apparmor apparmor-utils
-```
-
-#### 2. Повторение эксперимента из лекции
-```bash
-# Проверяем статус AppArmor
-sudo systemctl status apparmor
-sudo aa-status
-```
-
-#### 3. Отключение (удаление) AppArmor
-```bash
-sudo systemctl stop apparmor
-sudo systemctl disable apparmor
-sudo apt remove apparmor apparmor-utils
-```
-
-### Результаты выполнения:
-
-#### Установка AppArmor:
-```bash
-$ sudo apt install -y apparmor apparmor-utils
-apparmor is already the newest version (3.0.4-2ubuntu2.4).
-apparmor-utils is already the newest version (3.0.4-2ubuntu2.4).
-```
-
-#### Запуск и включение AppArmor:
-```bash
-$ sudo systemctl start apparmor
-$ sudo systemctl enable apparmor
-Created symlink /etc/systemd/system/sysinit.target.wants/apparmor.service → /lib/systemd/system/apparmor.service.
-```
-
-#### Проверка статуса и профилей AppArmor:
-```bash
-$ sudo aa-status
-apparmor module is loaded.
-27 profiles are loaded.
-27 profiles are in enforce mode.
-   /usr/bin/man
-   /usr/lib/NetworkManager/nm-dhcp-client.action
-   /usr/lib/NetworkManager/nm-dhcp-helper
-   /usr/lib/connman/scripts/dhclient-script
-   /{,usr/}sbin/dhclient
-   cat_test
-   libvirtd
-   libvirtd//qemu_bridge_helper
-   lsb_release
-   man_filter
-   man_groff
-   nvidia_modprobe
-   nvidia_modprobe//kmod
-   swtpm
-   tcpdump
-   test_apparmor
-   ubuntu_pro_apt_news
-   ubuntu_pro_esm_cache
-   ubuntu_pro_esm_cache//apt_methods
-   ubuntu_pro_esm_cache//apt_methods_gpgv
-   ubuntu_pro_esm_cache//cloud_id
-   ubuntu_pro_esm_cache//dpkg
-   ubuntu_pro_esm_cache//ps
-   ubuntu_pro_esm_cache//ubuntu_distro_info
-   ubuntu_pro_esm_cache_systemctl
-   ubuntu_pro_esm_cache_systemd_detect_virt
-   virt-aa-helper
-0 profiles are in complain mode.
-0 profiles are in kill mode.
-0 profiles are in unconfined mode.
-```
-
-#### Эксперимент с AppArmor:
-```bash
-$ echo "test content" | sudo tee /tmp/test_file
-$ cat /tmp/test_file
-test content
-```
-
-#### Отключение AppArmor:
-```bash
-$ sudo systemctl stop apparmor
-$ sudo systemctl disable apparmor
-Removed /etc/systemd/system/sysinit.target.wants/apparmor.service.
-$ sudo systemctl status apparmor
-○ apparmor.service - Load AppArmor profiles
-     Loaded: loaded (/lib/systemd/system/apparmor.service; disabled; vendor preset: enabled)
-     Active: inactive (dead)
-```
-
-**Вывод:** AppArmor успешно установлен, запущен с 27 активными профилями, проведен эксперимент, затем отключен.
-
----
 
 ## Выводы
 
-В ходе выполнения домашнего задания были изучены различные методы защиты данных на хосте:
+### Задание 1 (Разведка):
+1. **Suricata** не обнаружил сканирование nmap как подозрительную активность
+2. **Fail2Ban** показал исторические попытки атак на SSH от внешних IP-адресов
+3. Nmap успешно определил открытый SSH порт и версию службы
+4. Различные типы сканирования (sA, sT, sS, sV) дали разные результаты
 
-1. **eCryptfs** - позволяет шифровать отдельные файлы и каталоги
-2. **LUKS** - обеспечивает шифрование целых разделов диска
-3. **AppArmor** - система мандатного контроля доступа для приложений
+### Задание 2 (Брутфорс атака):
+1. **Fail2Ban** эффективно обнаружил множественные попытки подключения с неверными учетными данными
+2. После 5 неудачных попыток в течение 10 минут IP-адрес был заблокирован на 10 минут
+3. **Suricata** не зафиксировал события в логах (возможно, правила не настроены для SSH атак)
+4. SSH сервер корректно логировал все попытки подключения с несуществующим пользователем
 
-Все методы показали свою эффективность в защите данных от несанкционированного доступа.
+### Рекомендации по улучшению безопасности:
+1. Настроить правила Suricata для обнаружения сканирования портов
+2. Ужесточить настройки Fail2Ban (уменьшить количество попыток, увеличить время блокировки)
+3. Отключить аутентификацию по паролю SSH, использовать только ключи
+4. Настроить мониторинг и алерты для критических событий безопасности
+
+## Файлы проекта
+- `users.txt` - список пользователей для атаки
+- `pass.txt` - список паролей для атаки  
+- `simulate_attack.sh` - скрипт симуляции атаки
+- `README.md` - данный отчет
